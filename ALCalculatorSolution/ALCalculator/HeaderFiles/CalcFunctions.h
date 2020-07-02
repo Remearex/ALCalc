@@ -17,5 +17,7 @@ double getFloodDmgCalc(FloodPL pl);
 double getBurnDmgCalc(BurnPL pl);
 double getAccCalc(AccPL accPL);
 double getCritRateCalc(AccPL pl);
+double getGunEDPS(GunPL gunPl, AccPL accPl, double rldDuration, AmmoSkill ammoSkill);
+double getBarrageEDPS(std::vector<Barrage> indivBarrage, AccPL accPl, double rldDuration, AmmoSkill ammoSkill);
 
 std::vector<std::string> split(std::string s, char c);

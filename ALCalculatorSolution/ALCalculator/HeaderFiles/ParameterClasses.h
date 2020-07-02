@@ -10,6 +10,7 @@ enum class PlaneType {
 
 class Barrage {
 public:
+	double avgShellsHit;
 	double baseDmg;
 	double coefficient;
 	int count;
@@ -30,6 +31,7 @@ public:
 
 class GunPL {
 public:
+	double avgShellsHit;
 	int mgms;
 	double baseDmg;
 	double coefficient;
@@ -146,6 +148,9 @@ public:
 	bool pierce;
 	bool armorBreak;
 	bool flood;
+
+	BurnPL burnPl;
+	FloodPL floodPl;
 };
 
 class RldPL {

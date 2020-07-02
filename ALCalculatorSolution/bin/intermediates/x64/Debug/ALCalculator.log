@@ -1,5 +1,6 @@
-﻿  Main.cpp
-C:\C++Source\ALCalculatorSolution\ALCalculator\SourceFiles\Main.cpp(334,9): warning C4101: 'otherEDps': unreferenced local variable
-C:\C++Source\ALCalculatorSolution\ALCalculator\SourceFiles\Main.cpp(331,9): warning C4101: 'totEDPS': unreferenced local variable
-C:\C++Source\ALCalculatorSolution\ALCalculator\SourceFiles\Main.cpp(333,9): warning C4101: 'barrageEDps': unreferenced local variable
+﻿  CalcFunctions.cpp
+  Main.cpp
+C:\C++Source\ALCalculatorSolution\ALCalculator\SourceFiles\Main.cpp(330,9): warning C4101: 'otherEDps': unreferenced local variable
+C:\C++Source\ALCalculatorSolution\ALCalculator\SourceFiles\Main.cpp(327,9): warning C4101: 'totEDPS': unreferenced local variable
+  Generating Code...
   ALCalculator.vcxproj -> C:\C++Source\ALCalculatorSolution\bin\x64\Debug\ALCalculator.exe

@@ -14,10 +14,6 @@ void getCritRateInit();
 void getBBEDPSInit();
 void getCVEDPSInit();
 void getOtherEDPSInit();
-double getGunEDPS(AmmoSkill ammoSkill, GunPL gunPl, RldPL rldPl, AccPL accPl, BurnPL burnPl, FloodPL floodPl, double shellsHit, int totShells);
-double getTorpEDPS();
-double getAirStrikeEDPS();
-double getBarrageEDPS();
 void getFloodInit();
 void getBurnInit();
 
@@ -337,24 +333,69 @@ void getBBEDPSInit() {
 	std::vector<std::string> splittedInput;
 
 	//important stats and parameters, often reused
-	double baseDmg;
-	double coefficient;
-	double slotEff;
+	double mgBaseDmg;
+	double mgCoefficient;
+	double mgSlotEff;
+	int lvDifference;
+	bool ammoBuffBit;
 	double fp;
 	double fpFromGear;
 	double fpBonus;
-	double formationBonus;
-	double shellsHit;
-	int totShells;
+	double formationBonusOnFp;
+	
+	bool hasBarrage;
+	int barrageIDCount{};
+	std::vector<double> barrageBaseDmgs;
+	std::vector<double> barrageCoefficients;
+	double barrageScalingStat;
+	double barrageScalingStatFromGear;
+	double formationBonusOnBarrageScalingStat;
+	double barrageScalingStatBonus;
 
-	//ammo skill initialization
-	AmmoSkill ammoSkill;
-	ammoSkill.burn = false;
-	ammoSkill.flood = false;
-	ammoSkill.pierce = false;
-	ammoSkill.armorBreak = false;
+	double mgRldDuration;
 
-	//init RldPL
+	//init important parameters
+	std::cout << "does the ship have a barrage? ('y' for yes any other key for no): ";
+	std::getline(std::cin, input);
+	if(input == "y") {
+		hasBarrage = true;
+		std::cout << "how many different barrage ammo IDs? Each ID needs to be calculated separately. Ex. monarch only has 1, which is just the AP, and Georgia has 2, SHS and HE";
+		std::getline(std::cin, input);
+		barrageIDCount = std::stoi(input);
+		for (int i = 0; i < barrageIDCount; i++) {
+			std::cout << "enter barrage ID number" << i+1 << "'s barrageBaseDmg, barrageCoefficient:";
+			std::getline(std::cin, input);
+			splittedInput = split(input, ' ');
+			barrageBaseDmgs.push_back(std::stod(splittedInput.at(0)));
+			barrageCoefficients.push_back(std::stod(splittedInput.at(1)));
+		}
+		std::cout << "enter: barrageScalingStat, barrageScalingStatFromGear, formationBonusOnBarrageScalingStat, barrageScalingStatBonus:";
+		std::getline(std::cin, input);
+		splittedInput = split(input, ' ');
+		barrageScalingStat = std::stod(splittedInput.at(0));
+		barrageScalingStatFromGear = std::stod(splittedInput.at(1));
+		formationBonusOnBarrageScalingStat = std::stod(splittedInput.at(2));
+		barrageScalingStatBonus = std::stod(splittedInput.at(3));
+	} else {
+		hasBarrage = false;
+	}
+	std::cout << "enter: mgBaseDmg, mgCoefficient, mgSlotEff, lvDifference, fp, fpFromGear, fpBonus, formationBonus on fp:";
+	std::getline(std::cin, input);
+	splittedInput = split(input, ' ');
+	mgBaseDmg = std::stod(splittedInput.at(0));
+	mgCoefficient = std::stod(splittedInput.at(1));
+	mgSlotEff = std::stod(splittedInput.at(2));
+	lvDifference = std::stoi(splittedInput.at(3));
+	fp = std::stod(splittedInput.at(4));
+	fpFromGear = std::stod(splittedInput.at(5));
+	fpBonus = std::stod(splittedInput.at(6));
+	formationBonusOnFp = std::stod(splittedInput.at(7));
+	std::cout << "is ammo buff activated? ('y' for yes, any other key for no): ";
+	std::getline(std::cin, input);
+	if (input == "y") ammoBuffBit = 1;
+	else ammoBuffBit = 0;
+
+	//get mgRldDuration
 	RldPL rldPl;
 	std::cout << "the following will be in regards to the reload parameters" << std::endl;
 	std::cout << "enter: weaponRldDuration, rld, rldBonus" << std::endl;
@@ -372,6 +413,7 @@ void getBBEDPSInit() {
 		rldPl.rldBonusDuration = std::stod(input);
 	}
 	else rldPl.tempRldBonus = false;
+	mgRldDuration = getActualRldTime(rldPl);
 
 	//init AccPL
 	AccPL accPl;
@@ -396,91 +438,155 @@ void getBBEDPSInit() {
 //--------------------------------------------------------------------------------------------------------------------main gun specific	
 	//init GunPL
 	GunPL gunPl;
+	gunPl.baseDmg = mgBaseDmg;
+	gunPl.coefficient = mgCoefficient;
+	gunPl.slotEff = mgSlotEff;
+	gunPl.lvDifference = lvDifference;
+	gunPl.ammoBuffBit = ammoBuffBit;
+	gunPl.fp = fp;
+	gunPl.fpFromGear = fpFromGear;
+	gunPl.formationBonus = formationBonusOnFp;
+	gunPl.fpBonus = fpBonus;
 	std::cout << "the following will be in regards to the main gun of the ship" << std::endl;
-	std::cout << "enter: number of maingun mounts, baseDmg, coefficient, number of shells per main gun mount, slotEff, armorMod, lvDifference, " <<
-		"dmgBonus, ammoTypeMod, enemyDebuff, hunterBonus, fp, fpFromGear, formationBonus on fp, fpBonus, critBonus" << std::endl;
+	std::cout << "enter: number of maingun mounts, number of shells per main gun mount, armorMod, " <<
+		"dmgBonus, ammoTypeMod, enemyDebuff, hunterBonus, mgCritBonus" << std::endl;
 	std::getline(std::cin, input);
 	splittedInput = split(input, ' ');
 	gunPl.mgms = std::stoi(splittedInput.at(0));
-	gunPl.baseDmg = std::stod(splittedInput.at(1));
-	baseDmg = std::stod(splittedInput.at(1));
-	gunPl.coefficient = std::stod(splittedInput.at(2));
-	coefficient = std::stod(splittedInput.at(2));
-	gunPl.count = std::stoi(splittedInput.at(3));
-	gunPl.slotEff = std::stod(splittedInput.at(4));
-	slotEff = std::stod(splittedInput.at(4));
-	gunPl.armorMod = std::stod(splittedInput.at(5));
-	gunPl.lvDifference = std::stoi(splittedInput.at(6));
-	gunPl.dmgBonus = std::stod(splittedInput.at(7));
-	gunPl.ammoTypeMod = std::stod(splittedInput.at(8));
-	gunPl.enemyDebuff = std::stod(splittedInput.at(9));
-	gunPl.hunterBonus = std::stod(splittedInput.at(10));
-	gunPl.fp = std::stod(splittedInput.at(11));
-	fp = std::stod(splittedInput.at(11));
-	gunPl.fpFromGear = std::stod(splittedInput.at(12));
-	fpFromGear = std::stod(splittedInput.at(12));
-	gunPl.formationBonus = std::stod(splittedInput.at(13));
-	formationBonus = std::stod(splittedInput.at(13));
-	gunPl.fpBonus = std::stod(splittedInput.at(14));
-	fpBonus = std::stod(splittedInput.at(14));
-	gunPl.critBonus = std::stod(splittedInput.at(15));
-	std::cout << "is ammo buff activated? ('y' for yes, any other key for no): ";
-	std::getline(std::cin, input);
-	if (input == "y") gunPl.ammoBuffBit = 1;
-	else gunPl.ammoBuffBit = 0;
-
+	gunPl.count = std::stoi(splittedInput.at(1));
+	gunPl.armorMod = std::stod(splittedInput.at(2));
+	gunPl.dmgBonus = std::stod(splittedInput.at(3));
+	gunPl.ammoTypeMod = std::stod(splittedInput.at(4));
+	gunPl.enemyDebuff = std::stod(splittedInput.at(5));
+	gunPl.hunterBonus = std::stod(splittedInput.at(6));
+	gunPl.critBonus = std::stod(splittedInput.at(7));
 	std::cout << "out of " << gunPl.mgms * gunPl.count << " shells, what is the effective average number of shells that physically hit the target: ";
 	std::getline(std::cin, input);
-	shellsHit = std::stod(input);
-	totShells = gunPl.mgms * gunPl.count;
+	gunPl.avgShellsHit = std::stod(input);
 
 	//mg ammo skill selection
+	AmmoSkill mgAmmoSkill;
+	mgAmmoSkill.burn = false;
+	mgAmmoSkill.flood = false;
+	mgAmmoSkill.pierce = false;
+	mgAmmoSkill.armorBreak = false;
 	std::cout << "will mg cause burn, flood, pierce, armorBreak ('y' for yes any other key for no):" << std::endl;
 	std::getline(std::cin, input);
 	splittedInput = split(input, ' ');
-	if (splittedInput.at(0) == "y") ammoSkill.burn = true;
-	if (splittedInput.at(1) == "y") ammoSkill.flood = true;
-	if (splittedInput.at(2) == "y") ammoSkill.pierce = true;
-	if (splittedInput.at(3) == "y") ammoSkill.armorBreak = true;
+	if (splittedInput.at(0) == "y") mgAmmoSkill.burn = true;
+	if (splittedInput.at(1) == "y") mgAmmoSkill.flood = true;
+	if (splittedInput.at(2) == "y") mgAmmoSkill.pierce = true;
+	if (splittedInput.at(3) == "y") mgAmmoSkill.armorBreak = true;
 
-	//init mg ammo skill ParameterLists
-	BurnPL burnPl{};
-	FloodPL floodPl{};
-
-	if (ammoSkill.burn) {
-		burnPl.baseDmg = baseDmg;
-		burnPl.coefficient = coefficient;
-		burnPl.slotEff = slotEff;
-		burnPl.fp = fp;
-		burnPl.fpFromGear = fpFromGear;
-		burnPl.formationBonus = formationBonus;
-		burnPl.fpBonus = fpBonus;
+	if (mgAmmoSkill.burn) {
+		mgAmmoSkill.burnPl.baseDmg = mgBaseDmg;
+		mgAmmoSkill.burnPl.coefficient = mgCoefficient;
+		mgAmmoSkill.burnPl.slotEff = mgSlotEff;
+		mgAmmoSkill.burnPl.fp = fp;
+		mgAmmoSkill.burnPl.fpFromGear = fpFromGear;
+		mgAmmoSkill.burnPl.formationBonus = formationBonusOnFp;
+		mgAmmoSkill.burnPl.fpBonus = fpBonus;
 		std::cout << "burn coefficient and burnDmg bonus:" << std::endl;
 		std::getline(std::cin, input);
 		splittedInput = split(input, ' ');
-		burnPl.burnCoef = std::stod(splittedInput.at(0));
-		burnPl.burnDmgBonus = std::stod(splittedInput.at(1));
+		mgAmmoSkill.burnPl.burnCoef = std::stod(splittedInput.at(0));
+		mgAmmoSkill.burnPl.burnDmgBonus = std::stod(splittedInput.at(1));
 	}
-	if (ammoSkill.flood) {
-		floodPl.baseDmg = baseDmg;
-		floodPl.coefficient = coefficient;
+	if (mgAmmoSkill.flood) {
+		mgAmmoSkill.floodPl.baseDmg = mgBaseDmg;
+		mgAmmoSkill.floodPl.coefficient = mgCoefficient;
 		std::cout << "flood coefficient, scalingStat for flood, scalingStat from gear, scalingStatBonus, formationBonus on scalingStat:" << std::endl;
 		std::getline(std::cin, input);
 		splittedInput = split(input, ' ');
-		floodPl.floodCoef = std::stod(splittedInput.at(0));
-		floodPl.scalingStat = std::stod(splittedInput.at(1));
-		floodPl.scalingStatFromGear = std::stod(splittedInput.at(2));
-		floodPl.scalingStatBonus = std::stod(splittedInput.at(3));
-		floodPl.formationBonus = std::stod(splittedInput.at(4));
-	} 
-	mainGunEDps = getGunEDPS(ammoSkill, gunPl, rldPl, accPl, burnPl, floodPl, shellsHit, totShells);
+		mgAmmoSkill.floodPl.floodCoef = std::stod(splittedInput.at(0));
+		mgAmmoSkill.floodPl.scalingStat = std::stod(splittedInput.at(1));
+		mgAmmoSkill.floodPl.scalingStatFromGear = std::stod(splittedInput.at(2));
+		mgAmmoSkill.floodPl.scalingStatBonus = std::stod(splittedInput.at(3));
+		mgAmmoSkill.floodPl.formationBonus = std::stod(splittedInput.at(4));
+	}
+	mainGunEDps = getGunEDPS(gunPl, accPl, mgRldDuration, mgAmmoSkill);
 
-	std::cout << "mg dps: " << mainGunEDps << std::endl;
+//----------------------------------------------------------------------------------------------------------------barrage specific
+	//init barrage (parameter list for an individual barrage ammo or type)
+	if(hasBarrage) {
+		std::vector<Barrage> indivBarrages;
+		std::cout << "following will be barrage parameters" << std::endl;
+		for (int i = 0; i < barrageIDCount; i++) {
+			Barrage indivBarrage;
+			indivBarrage.baseDmg = barrageBaseDmgs.at(i);
+			indivBarrage.coefficient = barrageCoefficients.at(i);
+			indivBarrage.lvDifference = lvDifference;
+			indivBarrage.ammoBuffBit = ammoBuffBit;
+			indivBarrage.scalingStat = barrageScalingStat;
+			indivBarrage.scalingStatFromGear = barrageScalingStatFromGear;
+			indivBarrage.formationBonus = formationBonusOnBarrageScalingStat;
+			indivBarrage.scalingStatBonus = barrageScalingStatBonus;
+			std::cout << "enter barrage ID number " << i+1 << "'s number of shells, armorMod, scaling coefficient, dmgBonus, enemyDebuff, " <<
+				"hunterBonus, barrageCritBonus";
+			std::getline(std::cin, input);
+			splittedInput = split(input, ' ');
+			indivBarrage.count = std::stoi(splittedInput.at(0));
+			indivBarrage.armorMod = std::stod(splittedInput.at(1));
+			indivBarrage.scaling = std::stod(splittedInput.at(2));
+			indivBarrage.dmgBonus = std::stod(splittedInput.at(3));
+			indivBarrage.enemyDebuff = std::stod(splittedInput.at(4));
+			indivBarrage.hunterBonus = std::stod(splittedInput.at(5));
+			indivBarrage.critBonus = std::stod(splittedInput.at(6));
+		}
+		//barrage ammo skill selection
+		AmmoSkill barrageAmmoSkill;
+		barrageAmmoSkill.burn = false;
+		barrageAmmoSkill.flood = false;
+		barrageAmmoSkill.pierce = false;
+		barrageAmmoSkill.armorBreak = false;
+		std::cout << "does barrage have any ammo skills: ";
+		std::getline(std::cin, input);
+		if(input == "y") {
+			std::cout << "will barrage cause burn, flood, pierce, armorBreak ('y' for yes any other key for no):" << std::endl;
+			std::getline(std::cin, input);
+			splittedInput = split(input, ' ');
+			if (splittedInput.at(0) == "y") barrageAmmoSkill.burn = true;
+			if (splittedInput.at(1) == "y") barrageAmmoSkill.flood = true;
+			if (splittedInput.at(2) == "y") barrageAmmoSkill.pierce = true;
+			if (splittedInput.at(3) == "y") barrageAmmoSkill.armorBreak = true;
 
-	//barrage
-
-	//burn, armorbreak, or flood from barrage
-
+			if (barrageAmmoSkill.burn) {
+				barrageAmmoSkill.burnPl.slotEff = 1;
+				barrageAmmoSkill.burnPl.fp = fp;
+				barrageAmmoSkill.burnPl.fpFromGear = fpFromGear;
+				barrageAmmoSkill.burnPl.formationBonus = formationBonusOnFp;
+				barrageAmmoSkill.burnPl.fpBonus = fpBonus;
+				std::cout << "baseDmg, coefficient of barrage ammo, burn coefficient and burnDmg bonus:" << std::endl;
+				std::getline(std::cin, input);
+				splittedInput = split(input, ' ');
+				barrageAmmoSkill.burnPl.baseDmg = std::stod(splittedInput.at(0));
+				barrageAmmoSkill.burnPl.coefficient = std::stod(splittedInput.at(1));
+				barrageAmmoSkill.burnPl.burnCoef = std::stod(splittedInput.at(2));
+				barrageAmmoSkill.burnPl.burnDmgBonus = std::stod(splittedInput.at(3));
+			}
+			if (barrageAmmoSkill.flood) {
+				std::cout << "baseDmg, coefficient of barrage ammo, flood coefficient, scalingStat for flood, scalingStat from gear, scalingStatBonus, formationBonus on scalingStat:" << std::endl;
+				std::getline(std::cin, input);
+				splittedInput = split(input, ' ');
+				barrageAmmoSkill.floodPl.baseDmg = std::stod(splittedInput.at(0));
+				barrageAmmoSkill.floodPl.coefficient = std::stod(splittedInput.at(1));
+				barrageAmmoSkill.floodPl.floodCoef = std::stod(splittedInput.at(2));
+				barrageAmmoSkill.floodPl.scalingStat = std::stod(splittedInput.at(3));
+				barrageAmmoSkill.floodPl.scalingStatFromGear = std::stod(splittedInput.at(4));
+				barrageAmmoSkill.floodPl.scalingStatBonus = std::stod(splittedInput.at(5));
+				barrageAmmoSkill.floodPl.formationBonus = std::stod(splittedInput.at(6));
+			}
+		}
+		//separate crit rate for barrage?
+		std::cout << "separate critRateBonus for barrage?: ";
+		std::getline(std::cin, input);
+		if (input == "y") {
+			std::cout << "critRateBonus for barrage: ";
+			std::getline(std::cin, input);
+			accPl.critRateBonus = std::stod(input);
+		}
+		barrageEDps = getBarrageEDPS(indivBarrages, accPl, mgRldDuration, barrageAmmoSkill);
+	}
 }
 
 void getCVEDPSInit() {
@@ -489,53 +595,6 @@ void getCVEDPSInit() {
 
 void getOtherEDPSInit() {
 
-}
-
-double getGunEDPS(AmmoSkill ammoSkill, GunPL gunPl, RldPL rldPl, AccPL accPl, BurnPL burnPl, FloodPL floodPl, double shellsHit, int totShells) {
-	double nonCritDmg;
-	double critDmg;
-	double critRate;
-	double avgDmg;
-	double skillDmg = 0; //dmg from main gun skill(s)
-	double netDmg;
-	double eHitRate;
-	double rldDuration;
-	double EDPS;
-	
-	//nonCritDmg
-	gunPl.critBit = false;
-	nonCritDmg = getGunDmgCalc(gunPl);
-	//critDmg
-	gunPl.critBit = true;
-	critDmg = getGunDmgCalc(gunPl);
-	//critRate
-	critRate = getCritRateCalc(accPl);
-	//avgDmg
-	avgDmg = (critRate*critDmg) + ((1-critRate)*nonCritDmg);
-	//skillDmg
-	if(ammoSkill.burn) skillDmg += getBurnDmgCalc(burnPl);
-	if(ammoSkill.flood) skillDmg += getFloodDmgCalc(floodPl);
-	//netDmg
-	netDmg = avgDmg + skillDmg;
-	//effectiveHitRate
-	eHitRate = (shellsHit/totShells) * getAccCalc(accPl);
-	//rldDuration
-	rldDuration = getActualRldTime(rldPl);
-	//EDPS
-	EDPS = (netDmg*eHitRate) / rldDuration;
-	return EDPS;
-}
-
-double getTorpEDPS() {
-	return 0;
-}
-
-double getAirStrikeEDPS() {
-	return 0;
-}
-
-double getBarrageEDPS() {
-	return 0;
 }
 
 std::vector<std::string> split(std::string s, char c) {

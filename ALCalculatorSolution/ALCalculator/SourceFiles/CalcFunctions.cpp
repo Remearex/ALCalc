@@ -158,3 +158,47 @@ double getCritRateCalc(AccPL pl) {
 		((finalAttackerLuck-finalDefenderLuck+pl.lvDifference)/5000) + pl.critRateBonus;
 	return finalCritRate;
 }
+
+double getGunEDPS(GunPL gunPl, AccPL accPl, double rldDuration, AmmoSkill ammoSkill) {
+	double nonCritDmg;
+	double critDmg;
+	double critRate;
+	double avgDmg;
+	double skillDmg = 0; //dmg from main gun skill(s)
+	double netDmg;
+	double eHitRate;
+	double EDPS;
+
+	//nonCritDmg
+	gunPl.critBit = false;
+	nonCritDmg = getGunDmgCalc(gunPl);
+	//critDmg
+	gunPl.critBit = true;
+	critDmg = getGunDmgCalc(gunPl);
+	//critRate
+	critRate = getCritRateCalc(accPl);
+	//avgDmg
+	avgDmg = (critRate*critDmg) + ((1-critRate)*nonCritDmg);
+	//skillDmg
+	if (ammoSkill.burn) skillDmg += getBurnDmgCalc(ammoSkill.burnPl);
+	if (ammoSkill.flood) skillDmg += getFloodDmgCalc(ammoSkill.floodPl);
+	//netDmg
+	netDmg = avgDmg + skillDmg;
+	//effectiveHitRate
+	eHitRate = (gunPl.avgShellsHit/((double)gunPl.mgms*(double)gunPl.count)) * getAccCalc(accPl);
+	//EDPS
+	EDPS = (netDmg*eHitRate) / rldDuration;
+	return EDPS;
+}
+
+double getTorpEDPS() {
+	return 0;
+}
+
+double getAirStrikeEDPS() {
+	return 0;
+}
+
+double getBarrageEDPS(std::vector<Barrage> indivBarrage, AccPL accPl, double rldDuration, AmmoSkill ammoSkill) {
+	return 0;
+}
