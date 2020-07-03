@@ -15,9 +15,9 @@ double getPlaneGroundDmgCalc(PlaneGroundDmgPL planeDmgPL);
 double getAirStrikeDmgCalc(std::vector<Plane> planes, std::vector<double> effs, PlaneGroundDmgPL pl);
 double getFloodDmgCalc(FloodPL pl);
 double getBurnDmgCalc(BurnPL pl);
-double getAccCalc(AccPL accPL);
+double getHitRateCalc(AccPL accPL);
 double getCritRateCalc(AccPL pl);
 double getGunEDPS(GunPL gunPl, AccPL accPl, double rldDuration, AmmoSkill ammoSkill);
-double getBarrageEDPS(std::vector<Barrage> indivBarrage, AccPL accPl, double rldDuration, AmmoSkill ammoSkill);
+double getBarrageEDPS(WholeBarrage wholeBarrage, AccPL accPl, AmmoSkill ammoSkill);
 
 std::vector<std::string> split(std::string s, char c);

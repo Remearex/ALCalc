@@ -80,8 +80,8 @@ double getPullRate(double rateOfShip, int pulls) {
 	return 1 - std::pow(1-rateOfShip, pulls);
 }
 
-double getIndividualBarrageDmgCalc(Barrage barrage) {
-	double finalDmg = barrage.baseDmg * barrage.count * barrage.coefficient * barrage.armorMod * (1 + 2*(double)(barrage.lvDifference)/100) * (1 + barrage.ammoBuffBit*0.1 + barrage.dmgBonus) *
+double getIndividualBarrageDmgCalc(Barrage barrage, bool ammoBuffBit) {
+	double finalDmg = barrage.baseDmg * barrage.count * barrage.coefficient * barrage.armorMod * (1 + 2*(double)(barrage.lvDifference)/100) * (1 + ammoBuffBit*0.1 + barrage.dmgBonus) *
 		(1 + barrage.enemyDebuff) * (1 + barrage.hunterBonus) * (1 + (barrage.scalingStat+barrage.scalingStatFromGear)/100 * (1 + barrage.formationBonus + barrage.scalingStatBonus) * barrage.scaling) *
 		(1 + barrage.critBit*(0.5 + barrage.critBonus));
 	return finalDmg;
@@ -128,25 +128,26 @@ double getAirStrikeDmgCalc(std::vector<Plane> planes, std::vector<double> effs, 
 }
 
 double getFloodDmgCalc(FloodPL pl) {
-	double finalFloodDmg = pl.baseDmg * pl.coefficient *
-		(1 + (pl.scalingStat+pl.scalingStatFromGear)/100 * (1+pl.formationBonus+pl.scalingStatBonus)) * pl.floodCoef + 10;
+	double finalFloodDmg = (pl.duration/pl.tickInterval) * (pl.baseDmg * pl.coefficient *
+		(1 + (pl.scalingStat+pl.scalingStatFromGear)/100 * (1+pl.formationBonus+pl.scalingStatBonus)) * pl.floodCoef + 10);
 	return finalFloodDmg;
 }
 
 double getBurnDmgCalc(BurnPL pl) {
-	double finalBurnDmg = (1+pl.burnDmgBonus) * (pl.baseDmg * pl.coefficient * pl.slotEff *
+	double finalBurnDmg = (pl.duration/pl.tickInterval) * (1+pl.burnDmgBonus) * (pl.baseDmg * pl.coefficient * pl.slotEff *
 		(1 + (pl.fp+pl.fpFromGear)/100 * (1+pl.formationBonus+pl.fpBonus)) * pl.burnCoef + 5);
 	return finalBurnDmg;
 }
 
-double getAccCalc(AccPL accPL) {
+double getHitRateCalc(AccPL accPL) {
 	double finalAttackerHit = accPL.attackerHit * (1+accPL.attackerHitBonus);
 	double finalAttackerLuck = accPL.attackerLuck * (1+accPL.attackerLuckBonus);
 	double finalDefenderEva = accPL.defenderEva * (1+accPL.defenderEvaBonus);
 	double finalDefenderLuck = accPL.defenderLuck * (1+accPL.defenderLuckBonus);
-	double finalAcc = 0.1 + finalAttackerHit/(finalAttackerHit+finalDefenderEva+2) +
+	double finalHitRate = 0.1 + finalAttackerHit/(finalAttackerHit+finalDefenderEva+2) +
 		(finalAttackerLuck-finalDefenderLuck+accPL.lvDifference)/1000 + accPL.attackerAccBonus - accPL.defenderEvaRateBonus;
-	return finalAcc;
+	if(finalHitRate < 1) return finalHitRate;
+	else return 1;
 }
 
 double getCritRateCalc(AccPL pl) {
@@ -156,7 +157,8 @@ double getCritRateCalc(AccPL pl) {
 	double finalDefenderLuck = pl.defenderLuck * (1+pl.defenderLuckBonus);
 	double finalCritRate = 0.05 + (finalAttackerHit/(finalAttackerHit+finalDefenderEva+2000)) +
 		((finalAttackerLuck-finalDefenderLuck+pl.lvDifference)/5000) + pl.critRateBonus;
-	return finalCritRate;
+	if(finalCritRate < 1) return finalCritRate;
+	else return 1;
 }
 
 double getGunEDPS(GunPL gunPl, AccPL accPl, double rldDuration, AmmoSkill ammoSkill) {
@@ -164,10 +166,11 @@ double getGunEDPS(GunPL gunPl, AccPL accPl, double rldDuration, AmmoSkill ammoSk
 	double critDmg;
 	double critRate;
 	double avgDmg;
+	double shellingEDPS;
 	double skillDmg = 0; //dmg from main gun skill(s)
-	double netDmg;
+	double skillEDPS;
 	double eHitRate;
-	double EDPS;
+	double netEDPS;
 
 	//nonCritDmg
 	gunPl.critBit = false;
@@ -179,16 +182,18 @@ double getGunEDPS(GunPL gunPl, AccPL accPl, double rldDuration, AmmoSkill ammoSk
 	critRate = getCritRateCalc(accPl);
 	//avgDmg
 	avgDmg = (critRate*critDmg) + ((1-critRate)*nonCritDmg);
+	//effectiveHitRate
+	eHitRate = (gunPl.avgShellsHit/((double)gunPl.mgms*gunPl.count)) * getHitRateCalc(accPl);
+	//shellingEDPS
+	shellingEDPS = (avgDmg*eHitRate) / rldDuration;
 	//skillDmg
 	if (ammoSkill.burn) skillDmg += getBurnDmgCalc(ammoSkill.burnPl);
 	if (ammoSkill.flood) skillDmg += getFloodDmgCalc(ammoSkill.floodPl);
-	//netDmg
-	netDmg = avgDmg + skillDmg;
-	//effectiveHitRate
-	eHitRate = (gunPl.avgShellsHit/((double)gunPl.mgms*(double)gunPl.count)) * getAccCalc(accPl);
-	//EDPS
-	EDPS = (netDmg*eHitRate) / rldDuration;
-	return EDPS;
+	//skillEDPS
+	skillEDPS = skillDmg / rldDuration;
+	//netEDPS
+	netEDPS = shellingEDPS + skillEDPS;
+	return netEDPS;
 }
 
 double getTorpEDPS() {
@@ -199,6 +204,39 @@ double getAirStrikeEDPS() {
 	return 0;
 }
 
-double getBarrageEDPS(std::vector<Barrage> indivBarrage, AccPL accPl, double rldDuration, AmmoSkill ammoSkill) {
-	return 0;
+double getBarrageEDPS(WholeBarrage wholeBarrage, AccPL accPl, AmmoSkill ammoSkill) {
+	double barrageEDPS = 0;
+	double skillEDPS;
+	double finalEDPS;
+
+	//barrage edps
+	double rngHitRate = getHitRateCalc(accPl);
+	for (int i = 0; i < wholeBarrage.barrages.size(); i++) {
+		bool ammoBuffBit = wholeBarrage.ammoBuffBit;
+		Barrage thisBarrage = wholeBarrage.barrages.at(i);
+		//get the avg raw dmg (factoring crit)
+		thisBarrage.critBit = 0;
+		double rawBarrageNonCritDmg = getIndividualBarrageDmgCalc(thisBarrage, ammoBuffBit);
+		thisBarrage.critBit = 1;
+		double rawBarrageCritDmg = getIndividualBarrageDmgCalc(thisBarrage, ammoBuffBit);
+		double critRate;
+		if(wholeBarrage.guaranteedCrit) critRate = 1;
+		else critRate = getCritRateCalc(accPl);
+		double netRawDmg = ((1-critRate)*rawBarrageNonCritDmg) + (critRate*rawBarrageCritDmg);
+		//get eHitRate (physical and rng)
+		double eHitRate = (thisBarrage.avgShellsHit/(double)thisBarrage.count) * rngHitRate;
+		//get effective dmg (proc chance and eHitRate)
+		double effectiveBarrageDmg = wholeBarrage.procChance * eHitRate * netRawDmg;
+		//final edps (rld)
+		double eDPS = effectiveBarrageDmg / wholeBarrage.rldDuration;
+		barrageEDPS += eDPS;
+	}
+	//barrage skill edps
+	double skillDmg = 0;
+	if(ammoSkill.burn) skillDmg += getBurnDmgCalc(ammoSkill.burnPl);
+	if(ammoSkill.flood) skillDmg += getFloodDmgCalc(ammoSkill.floodPl);
+	skillEDPS = skillDmg / wholeBarrage.rldDuration;
+	//final EDPS (barrage and barrage ammo skill together)
+	finalEDPS = barrageEDPS + skillEDPS;
+	return finalEDPS;
 }

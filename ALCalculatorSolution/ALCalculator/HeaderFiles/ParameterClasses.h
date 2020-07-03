@@ -17,7 +17,6 @@ public:
 	double armorMod;
 	double scaling;
 	int lvDifference;
-	bool ammoBuffBit;
 	double dmgBonus;
 	double enemyDebuff;
 	double hunterBonus;
@@ -27,6 +26,15 @@ public:
 	double scalingStatBonus;
 	bool critBit;
 	double critBonus;
+};
+
+class WholeBarrage {
+public:
+	std::vector<Barrage> barrages;
+	double rldDuration;
+	double procChance;
+	bool ammoBuffBit;
+	bool guaranteedCrit;
 };
 
 class GunPL {
@@ -119,6 +127,8 @@ public:
 
 class FloodPL {
 public:
+	int duration;
+	int tickInterval;
 	double baseDmg;
 	double coefficient;
 	double scalingStat;
@@ -130,6 +140,8 @@ public:
 
 class BurnPL {
 public:
+	int duration;
+	int tickInterval;
 	double burnDmgBonus;
 	double baseDmg;
 	double coefficient;
